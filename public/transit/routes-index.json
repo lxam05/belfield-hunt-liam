@@ -1,0 +1,242 @@
+{
+ "generatedAt": "2026-11-20T15:50:52.569Z",
+ "source": "https://www.transportforireland.ie/transitData/Data/GTFS_Realtime.zip",
+ "routes": {
+  "2": {
+   "colour": "#2563eb",
+   "operator": "Bus Éireann",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Dublin Airport - Gorey - Wexford"
+  },
+  "47": {
+   "colour": "#4f46e5",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "Sandyford",
+    "UCD"
+   ],
+   "longName": "Poolbeg Street - Belarmine"
+  },
+  "114": {
+   "colour": "#0d9488",
+   "operator": "Go-Ahead Ireland",
+   "kind": "bus",
+   "serves": [
+    "Sandyford"
+   ],
+   "longName": "Ticknock - Blackrock"
+  },
+  "116": {
+   "colour": "#9333ea",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Whitechurch - Parnell Square"
+  },
+  "118": {
+   "colour": "#c2410c",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "Sandyford",
+    "UCD"
+   ],
+   "longName": "Kilternan - Eden Quay"
+  },
+  "133": {
+   "colour": "#0284c7",
+   "operator": "Bus Éireann",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Dublin - Wicklow"
+  },
+  "142": {
+   "colour": "#2563eb",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Portmarnock - UCD (Belfield)"
+  },
+  "7B": {
+   "colour": "#db2777",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Shankill - Mountjoy Square"
+  },
+  "7D": {
+   "colour": "#ea580c",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Dalkey - Mountjoy Square"
+  },
+  "27X": {
+   "colour": "#7c3aed",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Clare Hall - UCD Belfield"
+  },
+  "32X": {
+   "colour": "#0891b2",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "UCD Belfield - Malahide"
+  },
+  "39A": {
+   "colour": "#ca8a04",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Ongar - UCD Belfield"
+  },
+  "41X": {
+   "colour": "#dc2626",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Swords - UCD Belfield"
+  },
+  "E1": {
+   "colour": "#db2777",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Ballywaltrim - Northwood"
+  },
+  "E2": {
+   "colour": "#ea580c",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Dun Laoghaire - Harristown"
+  },
+  "Green Line": {
+   "colour": "#00af3f",
+   "operator": "LUAS",
+   "kind": "luas",
+   "serves": [
+    "Sandyford"
+   ],
+   "longName": "Parnell - Brides Glen"
+  },
+  "S4": {
+   "colour": "#7c3aed",
+   "operator": "Go-Ahead Ireland",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Liffey Valley - UCD"
+  },
+  "S8": {
+   "colour": "#0891b2",
+   "operator": "Go-Ahead Ireland",
+   "kind": "bus",
+   "serves": [
+    "Sandyford"
+   ],
+   "longName": "Kingswood Avenue - Dun Laoghaire Stn"
+  },
+  "X1": {
+   "colour": "#ca8a04",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Kilcoole - Hawkins Street"
+  },
+  "X2": {
+   "colour": "#dc2626",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Newcastle - Hawkins Street"
+  },
+  "X25": {
+   "colour": "#4f46e5",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Maynooth - Easton Rd - UCD"
+  },
+  "X27": {
+   "colour": "#0d9488",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Salesian College - Aghards Rd - UCD"
+  },
+  "X28": {
+   "colour": "#9333ea",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Salesian College - Celbridge Main St - UCD"
+  },
+  "X30": {
+   "colour": "#c2410c",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Dodsboro - UCD"
+  },
+  "X31": {
+   "colour": "#0284c7",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "River Forest - UCD Belfield"
+  },
+  "X32": {
+   "colour": "#2563eb",
+   "operator": "Bus Átha Cliath – Dublin Bus",
+   "kind": "bus",
+   "serves": [
+    "UCD"
+   ],
+   "longName": "Kildare Innovation Campus - UCD Belfield"
+  }
+ }
+}
