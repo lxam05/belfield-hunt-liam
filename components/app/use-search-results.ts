@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { firstSeenBetween } from "@/lib/listing-review";
+import type { Bedrooms } from "@/lib/bedroom-filter";
 import type { Row } from "@/lib/store/hooks";
 
 export type Run = {
@@ -11,7 +12,7 @@ export type Run = {
   new_items: number;
   status: string;
 };
-export type Home = { id: number; title: string; price_text: string | null };
+export type Home = Bedrooms & { id: number; title: string; price_text: string | null };
 
 export function useSearchData<T>(url: string | null, refresh = false) {
   const [result, setResult] = useState<{ url: string; data?: T; error?: string } | null>(null);

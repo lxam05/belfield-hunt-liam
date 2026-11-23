@@ -6,6 +6,8 @@ import { useSearchParams } from "next/navigation";
 import type { GeoJSONSource, Map as MlMap, Marker } from "maplibre-gl";
 
 import { MAP_STYLE_URL } from "@/lib/supabase/public-env";
+import { BedroomFilter } from "@/components/app/bedroom-filter";
+import { matchesBedrooms, readBedrooms } from "@/lib/bedroom-filter";
 import Link from "next/link";
 import { campusPoint } from "@/lib/rental-search";
 import { useDestinations, useMe, useMembers, useRows, useSearchSettings } from "@/lib/store/hooks";
@@ -106,14 +108,18 @@ export function MapView({
   const destinations = useDestinations();
   const search = useSearchSettings();
   const params = useSearchParams();
+  const bedsParam = params.get("beds");
+  const bedrooms = useMemo(() => readBedrooms(bedsParam), [bedsParam]);
   const legacyNew = params.get("show") === "new";
   const mode = legacyNew ? "all" : params.get("show") ?? "matches";
   const onlyNew = !editDestinations && (legacyNew || params.get("new") === "1");
   const searchRun = params.get("run") ?? "";
   const { isNew, loading: searchLoading, error: searchError, runId } = useSearchResults(onlyNew ? searchRun : "", onlyNew);
-  function setMode(value: string, newOnly = onlyNew) {
+  function setMode(value: string, newOnly = onlyNew, counts: readonly number[] = bedrooms) {
     const url = new URL(window.location.href);
     url.searchParams.set("show", value);
+    if (counts.length) url.searchParams.set("beds", counts.join(","));
+    else url.searchParams.delete("beds");
     if (newOnly) url.searchParams.set("new", "1");
     else url.searchParams.delete("new");
     setOverlap([]);
@@ -123,8 +129,8 @@ export function MapView({
   const focus = Number(params.get("focus")) || null;
 
   const active = useMemo(
-    () => rows.filter((r) => (mode === "all" || !r.pipeline?.hidden) && r.listing.status !== "gone"),
-    [rows, mode],
+    () => rows.filter((r) => (mode === "all" || !r.pipeline?.hidden) && r.listing.status !== "gone" && matchesBedrooms(r.listing, bedrooms)),
+    [rows, mode, bedrooms],
   );
   const selected = active.find((r) => r.listing.id === focus);
   const myVote = selected?.votes.find((v) => v.member_id === member?.id)?.value ?? 0;
@@ -506,7 +512,7 @@ export function MapView({
   }, [loaded, focus, located, lat, lng]);
 
   useEffect(() => {
-    const frame = [mode, onlyNew, runId].join("/");
+    const frame = [mode, onlyNew, runId, bedsParam].join("/");
     if (!loaded || editDestinations || searchLoading || searchError || framed.current === frame) return;
     framed.current = frame;
     if (focus) return;
@@ -524,7 +530,7 @@ export function MapView({
       ],
       { padding: 48, duration: 0 },
     );
-  }, [loaded, mode, focus, listingsGeo, destinations, editDestinations, onlyNew, runId, searchLoading, searchError]);
+  }, [loaded, mode, focus, listingsGeo, destinations, editDestinations, onlyNew, runId, searchLoading, searchError, bedsParam]);
 
   async function decide(action: "shortlisted" | "applied" | "hide") {
     if (!selected || busy) return;
@@ -588,6 +594,7 @@ export function MapView({
                 {visibleRows.length} listings
               </button>
             </div>
+            <BedroomFilter selected={bedrooms} onChange={(counts) => setMode(mode, onlyNew, counts)} />
             <label className="mt-2 flex items-center gap-2">
               <input type="checkbox" checked={onlyNew} onChange={(e) => setMode(mode, e.target.checked)} />
               {searchRun ? "New in this search" : "New in latest search"}
@@ -597,8 +604,8 @@ export function MapView({
             {!searchLoading && !searchError && !visibleRows.length && (
               <p className="py-2">
                 No listings in this view.
-                {(mode !== "all" || onlyNew) && (
-                  <button className="ml-1 underline" onClick={() => setMode("all", false)}>
+                {(mode !== "all" || onlyNew || bedrooms.length > 0) && (
+                  <button className="ml-1 underline" onClick={() => setMode("all", false, [])}>
                     See all listings
                   </button>
                 )}

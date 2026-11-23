@@ -42,7 +42,14 @@ export async function GET(request: Request) {
     );
   try {
     const { listings } = normalizeItems(await fetchDatasetItems(token, data.dataset_id));
-    const homes = listings.map(({ id, title, price_text }) => ({ id, title, price_text }));
+    const homes = listings.map(({ id, title, price_text, beds, beds_min, beds_max }) => ({
+      id,
+      title,
+      price_text,
+      beds,
+      beds_min,
+      beds_max,
+    }));
     if (!params.has("details")) return NextResponse.json(homes);
     const { apify_run_id, received_at, finished_at, items, new_items, status } = data;
     return NextResponse.json({

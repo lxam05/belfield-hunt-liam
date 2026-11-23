@@ -1,22 +1,28 @@
 "use client";
 
 import { useMemo } from "react";
+import { BedroomFilter } from "@/components/app/bedroom-filter";
+import { matchesBedrooms, readBedrooms } from "@/lib/bedroom-filter";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { isUnreviewed, type ReviewFilter } from "@/lib/listing-review";
 import { useRows } from "@/lib/store/hooks";
 import { useSearchResults, useSearchData, type Run } from "@/components/app/use-search-results";
 
-function updateSearch(run: string, filter: ReviewFilter) {
+function updateSearch(run: string, filter: ReviewFilter, counts?: number[]) {
   const url = new URL(window.location.href);
   if (run) url.searchParams.set("run", run);
   else url.searchParams.delete("run");
+  if (counts?.length) url.searchParams.set("beds", counts.join(","));
+  else if (counts) url.searchParams.delete("beds");
   url.searchParams.set("show", filter);
   window.history.pushState(null, "", url);
 }
 
 export default function Searches() {
   const params = useSearchParams();
+  const bedsParam = params.get("beds");
+  const bedrooms = useMemo(() => readBedrooms(bedsParam), [bedsParam]);
   const selected = params.get("run") ?? "";
   const show = params.get("show");
   const filter = show === "new" || show === "unreviewed" ? show : "all";
@@ -27,6 +33,7 @@ export default function Searches() {
   const homes = selected ? (results.homes ?? []) : rows.map((r) => r.listing);
   const visible = homes
     .filter((home) => {
+      if (!matchesBedrooms(home, bedrooms)) return false;
       if (filter === "all") return true;
       const row = byId.get(home.id);
       if (!row) return false;
@@ -78,6 +85,10 @@ export default function Searches() {
           </button>
         ))}
       </div>
+      <BedroomFilter
+        selected={bedrooms}
+        onChange={(counts) => updateSearch(selected, filter, counts)}
+      />
       {filter === "unreviewed" && (
         <p className="text-muted-foreground text-sm">
           Listings nobody in your group has acted on yet.
@@ -103,7 +114,8 @@ export default function Searches() {
                   ? "&show=all&new=1" + (selected ? "&run=" + encodeURIComponent(selected) : "")
                   : !selected && !row.pipeline?.hidden
                     ? "&show=" + filter
-                    : "&show=all")
+                    : "&show=all") +
+                (bedrooms.length ? "&beds=" + bedrooms.join(",") : "")
               : "https://www.daft.ie/for-rent/listing/" + h.id;
           return (
             <Link key={h.id} className="paper-note block p-3" href={href}>
