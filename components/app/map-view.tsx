@@ -12,6 +12,8 @@ import { useDestinations, useMe, useMembers, useRows, useSearchSettings } from "
 import { hide, setStage, updateDestination, vote } from "@/lib/store/actions";
 import type { Destination } from "@/lib/store/types";
 import { Button } from "@/components/ui/button";
+import { isNewToday, isUnreviewed } from "@/lib/listing-review";
+import { useReviewClock } from "./use-review-clock";
 import { bedsText, rentText } from "./bits";
 
 interface RouteIndexEntry {
@@ -71,7 +73,7 @@ export function MapView({
   const mapRef = useRef<MlMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [mode, setMode] = useState("matches");
+  const now = useReviewClock();
   const [browse, setBrowse] = useState(false);
   const [overlap, setOverlap] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
@@ -105,11 +107,18 @@ export function MapView({
   const destinations = useDestinations();
   const search = useSearchSettings();
   const params = useSearchParams();
+  const mode = params.get("show") ?? "matches";
+  function setMode(value: string) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("show", value);
+    url.searchParams.delete("focus");
+    window.history.replaceState(null, "", url);
+  }
   const focus = Number(params.get("focus")) || null;
 
   const active = useMemo(
-    () => rows.filter((r) => !r.pipeline?.hidden && r.listing.status !== "gone"),
-    [rows],
+    () => rows.filter((r) => (mode === "all" || !r.pipeline?.hidden) && r.listing.status !== "gone"),
+    [rows, mode],
   );
   const selected = active.find((r) => r.listing.id === focus);
   const myVote = selected?.votes.find((v) => v.member_id === member?.id)?.value ?? 0;
@@ -129,6 +138,8 @@ export function MapView({
     () =>
       active
         .filter((r) => {
+          if (mode === "new") return isNewToday(r, now);
+          if (mode === "unreviewed") return isUnreviewed(r);
           if (mode === "matches") return r.fits || isLiked(r);
           if (mode === "liked") return isLiked(r);
           if (mode === "checking")
@@ -137,16 +148,21 @@ export function MapView({
           if (mode === "applied") return r.pipeline?.stage === "applied";
           return true;
         })
-        .sort((a, b) => b.score.total - a.score.total),
-    [active, mode],
+        .sort((a, b) => mode === "new" || mode === "unreviewed"
+          ? Date.parse(b.listing.first_seen_at) - Date.parse(a.listing.first_seen_at)
+          : b.score.total - a.score.total),
+    [active, mode, now],
   );
+  const reviewing = mode === "new" || mode === "unreviewed";
+  const selectedIndex = visibleRows.findIndex((r) => r.listing.id === focus);
+  const nextRow = visibleRows[selectedIndex + 1];
   const listingsGeo = useMemo(() => {
     const groups = new Map<
       string,
       { coordinates: number[]; ids: number[]; label: string; colour: string; liked: boolean }
     >();
     const addresses = new Map<string,string>();
-    for (const r of selected && !visibleRows.includes(selected)
+    for (const r of !reviewing && selected && !visibleRows.includes(selected)
       ? [...visibleRows, selected]
       : visibleRows) {
       const areaOnly = r.listing.geocode_precision === "area";
@@ -185,7 +201,7 @@ export function MapView({
         geometry: { type: "Point" as const, coordinates: g.coordinates },
       })),
     };
-  }, [visibleRows, selected, focus, seen]);
+  }, [visibleRows, selected, focus, seen, reviewing]);
 
   // Init map once.
   useEffect(() => {
@@ -511,7 +527,7 @@ export function MapView({
         action === "hide"
           ? await hide(selected.listing.id)
           : await setStage(selected.listing.id, action);
-      if (ok) {selectListing(null); setOverlap([]); }
+      if (ok) {selectListing(reviewing ? nextRow?.listing.id ?? null : null); setOverlap([]); }
     } finally {
       setBusy(false);
     }
@@ -543,13 +559,14 @@ export function MapView({
                 className="bg-background rounded border px-2 py-2"
                 value={mode}
                 onChange={(e) => {
-                  selectListing(null);
                   setMode(e.target.value);
                   setOverlap([]);
                 }}
               >
                 <option value="matches">Matches</option>
-                <option value="all">All listings</option>
+                <option value="all">All found</option>
+                <option value="new">New · last 24 hours</option>
+                <option value="unreviewed">Unreviewed</option>
                 <option value="checking">Needs checking</option>
                 <option value="liked">I like these</option>
                 <option value="maybe">Maybe</option>
@@ -603,7 +620,12 @@ export function MapView({
                 </button>
               </p>
             )}
-            <p className="text-muted-foreground mt-2">● Unopened · Best matches first</p>
+            <p className="text-muted-foreground mt-2">● Unopened · {reviewing ? "Newest first" : "Best matches first"}</p>
+            {reviewing && !selected && visibleRows.length > 0 && (
+              <button className="mt-2 underline" onClick={() => selectListing(visibleRows[0].listing.id)}>
+                Review listings
+              </button>
+            )}
             {browse && (
               <div className="mt-2 max-h-52 overflow-auto border-t">
                 {visibleRows
@@ -711,7 +733,7 @@ export function MapView({
               ✕
             </button>
           </div>
-          {active
+          {visibleRows
             .filter((r) => overlap.includes(r.listing.id))
             .map((r, i) => (
               <button
@@ -814,6 +836,9 @@ export function MapView({
               </p>
             )}
             <div className="flex gap-5 text-sm underline">
+              {reviewing && <button onClick={() => selectListing(nextRow?.listing.id ?? null)}>
+                {nextRow ? "Next listing" : "Finish review"}
+              </button>}
               <Link href={`/listing/${selected.listing.id}`}>Full details</Link>
               <a href={selected.listing.url} target="_blank" rel="noopener noreferrer">
                 Open on Daft ↗

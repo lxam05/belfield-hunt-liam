@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const runs = supabaseAdmin().from("scrape_runs");
   if (!id) {
     const { data, error } = await runs
-      .select("apify_run_id,received_at,items,new_items,status")
+      .select("apify_run_id,received_at,finished_at,items,new_items,status")
       .order("received_at", { ascending: false })
       .limit(100);
     return error

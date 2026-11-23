@@ -1,72 +1,168 @@
 "use client";
-import { useState, useEffect } from "react";
+
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import {
+  firstSeenBetween,
+  isNewToday,
+  isUnreviewed,
+  type ReviewFilter,
+} from "@/lib/listing-review";
+import { useRows } from "@/lib/store/hooks";
+import { useReviewClock } from "@/components/app/use-review-clock";
 
 type Run = {
   apify_run_id: string;
   received_at: string;
+  finished_at: string | null;
   items: number;
   new_items: number;
   status: string;
 };
 type Home = { id: number; title: string; price_text: string | null };
-export default function Searches() {
-  const [runs, setRuns] = useState<Run[]>([]),
-    [homes, setHomes] = useState<Home[]>([]);
-  const [selected, setSelected] = useState(""),
-    [message, setMessage] = useState("Loading searches…");
+
+function updateSearch(run: string, filter: ReviewFilter) {
+  const url = new URL(window.location.href);
+  if (run) url.searchParams.set("run", run);
+  else url.searchParams.delete("run");
+  url.searchParams.set("show", filter);
+  window.history.pushState(null, "", url);
+}
+
+function useSearchData<T>(url: string | null) {
+  const [result, setResult] = useState<{ url: string; data?: T; error?: string } | null>(null);
   useEffect(() => {
+    if (!url) return;
     const controller = new AbortController();
-    fetch("/api/scrape-history" + (selected ? "?run=" + encodeURIComponent(selected) : ""), {
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw Error(data.error);
-        return data;
-      })
-      .then((data) => {
-        if (controller.signal.aborted) return;
-        if (selected) setHomes(data);
-        else setRuns(data);
-        setMessage(data.length ? "" : selected ? "No listings returned." : "No searches yet.");
-      })
-      .catch((e) => {
-        if (!controller.signal.aborted) setMessage(e.message);
-      });
+    async function load(path: string) {
+      try {
+        const res = await fetch(path, { signal: controller.signal });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Could not load search results.");
+        if (!controller.signal.aborted) setResult({ url: path, data });
+      } catch (e) {
+        if (!controller.signal.aborted)
+          setResult({
+            url: path,
+            error: e instanceof Error ? e.message : "Could not load search results.",
+          });
+      }
+    }
+    void load(url);
     return () => controller.abort();
-  }, [selected]);
-  function open(id: string) {
-    setSelected(id);
-    setHomes([]);
-    setMessage("Loading…");
-  }
+  }, [url]);
+  return result?.url === url ? result : null;
+}
+
+export default function Searches() {
+  const params = useSearchParams();
+  const selected = params.get("run") ?? "";
+  const show = params.get("show");
+  const filter = show === "new" || show === "unreviewed" ? show : "all";
+  const history = useSearchData<Run[]>("/api/scrape-history");
+  const runResults = useSearchData<Home[]>(
+    selected ? "/api/scrape-history?run=" + encodeURIComponent(selected) : null,
+  );
+  const run = history?.data?.find((r) => r.apify_run_id === selected);
+  const rows = useRows();
+  const byId = useMemo(() => new Map(rows.map((r) => [r.listing.id, r])), [rows]);
+  const now = useReviewClock();
+  const homes = selected ? (runResults?.data ?? []) : rows.map((r) => r.listing);
+  const visible = homes
+    .filter((home) => {
+      if (filter === "all") return true;
+      const row = byId.get(home.id);
+      if (!row) return false;
+      if (filter === "unreviewed") return isUnreviewed(row);
+      if (!selected) return isNewToday(row, now);
+      return (
+        run?.status === "succeeded" &&
+        run.new_items > 0 &&
+        !!run.finished_at &&
+        firstSeenBetween(
+          row.listing.first_seen_at,
+          Date.parse(run.received_at),
+          Date.parse(run.finished_at),
+        )
+      );
+    })
+    .sort((a, b) =>
+      (byId.get(b.id)?.listing.first_seen_at ?? "").localeCompare(
+        byId.get(a.id)?.listing.first_seen_at ?? "",
+      ),
+    );
+  const error = selected ? runResults?.error || (filter === "new" && history?.error) : null;
+  const loading = selected && (!runResults || (filter === "new" && !history));
+
   return (
     <section className="mx-auto max-w-2xl space-y-4 p-5 pb-24">
-      <h1>Recent searches</h1>
-      {selected && <button onClick={() => open("")}>← All searches</button>}
-      {message && <p role="status">{message}</p>}
-      {!selected
-        ? runs.map((r) => (
-            <button
-              key={r.apify_run_id}
-              className="paper-note block w-full p-4 text-left"
-              onClick={() => open(r.apify_run_id)}
-            >
-              <strong>
-                {new Date(r.received_at).toLocaleString("en-IE", { timeZone: "Europe/Dublin" })}
-              </strong>
-              <span className="block text-sm">
-                {r.status === "succeeded" ? r.items + " found · " + r.new_items + " new" : r.status}
-              </span>
-            </button>
-          ))
-        : homes.map((h) => (
-            <Link key={h.id} className="paper-note block p-3" href={"/map?focus=" + h.id}>
+      <h1>Searches</h1>
+      <label className="block text-sm font-medium">
+        Search
+        <select
+          className="bg-background mt-1 block w-full rounded border p-2"
+          value={selected}
+          onChange={(e) => updateSearch(e.target.value, filter)}
+        >
+          <option value="">All searches</option>
+          {history?.data?.map((r) => (
+            <option key={r.apify_run_id} value={r.apify_run_id}>
+              {new Date(r.received_at).toLocaleString("en-IE", { timeZone: "Europe/Dublin" })} ·{" "}
+              {r.status === "succeeded" ? r.items + " found · " + r.new_items + " new" : r.status}
+            </option>
+          ))}
+        </select>
+      </label>
+      {history?.error && <p role="alert">{history.error}</p>}
+      <div className="flex flex-wrap gap-2" aria-label="Filter listings" role="group">
+        {(["all", "new", "unreviewed"] as const).map((value) => (
+          <button
+            key={value}
+            aria-pressed={value === filter}
+            className="aria-pressed:bg-primary aria-pressed:text-primary-foreground rounded border px-3 py-2 text-sm"
+            onClick={() => updateSearch(selected, value)}
+          >
+            {value === "all"
+              ? "All found"
+              : value === "new"
+                ? selected
+                  ? "New in this search"
+                  : "New · last 24 hours"
+                : "Unreviewed"}
+          </button>
+        ))}
+      </div>
+      {filter === "unreviewed" && (
+        <p className="text-muted-foreground text-sm">
+          Listings nobody in your group has acted on yet.
+        </p>
+      )}
+      <p role="status">
+        {error ||
+          (loading
+            ? "Loading search results…"
+            : visible.length
+              ? visible.length + (visible.length === 1 ? " listing" : " listings")
+              : "No listings in this view.")}
+      </p>
+      {!error &&
+        !loading &&
+        visible.map((h) => {
+          const row = byId.get(h.id);
+          const href =
+            row && row.listing.status !== "gone"
+              ? "/map?focus=" +
+                h.id +
+                (!selected && !row.pipeline?.hidden ? "&show=" + filter : "&show=all")
+              : "https://www.daft.ie/for-rent/listing/" + h.id;
+          return (
+            <Link key={h.id} className="paper-note block p-3" href={href}>
               {h.title}
               <small className="block">{h.price_text}</small>
             </Link>
-          ))}
+          );
+        })}
     </section>
   );
 }
