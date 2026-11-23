@@ -12,8 +12,8 @@ import { useDestinations, useMe, useMembers, useRows, useSearchSettings } from "
 import { hide, setStage, updateDestination, vote } from "@/lib/store/actions";
 import type { Destination } from "@/lib/store/types";
 import { Button } from "@/components/ui/button";
-import { isNewToday, isUnreviewed } from "@/lib/listing-review";
-import { useReviewClock } from "./use-review-clock";
+import { isUnreviewed } from "@/lib/listing-review";
+import { useSearchResults } from "./use-search-results";
 import { bedsText, rentText } from "./bits";
 
 interface RouteIndexEntry {
@@ -73,7 +73,6 @@ export function MapView({
   const mapRef = useRef<MlMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const now = useReviewClock();
   const [browse, setBrowse] = useState(false);
   const [overlap, setOverlap] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
@@ -107,10 +106,17 @@ export function MapView({
   const destinations = useDestinations();
   const search = useSearchSettings();
   const params = useSearchParams();
-  const mode = params.get("show") ?? "matches";
-  function setMode(value: string) {
+  const legacyNew = params.get("show") === "new";
+  const mode = legacyNew ? "all" : params.get("show") ?? "matches";
+  const onlyNew = !editDestinations && (legacyNew || params.get("new") === "1");
+  const searchRun = params.get("run") ?? "";
+  const { isNew, loading: searchLoading, error: searchError, runId } = useSearchResults(onlyNew ? searchRun : "", onlyNew);
+  function setMode(value: string, newOnly = onlyNew) {
     const url = new URL(window.location.href);
     url.searchParams.set("show", value);
+    if (newOnly) url.searchParams.set("new", "1");
+    else url.searchParams.delete("new");
+    setOverlap([]);
     url.searchParams.delete("focus");
     window.history.replaceState(null, "", url);
   }
@@ -138,7 +144,7 @@ export function MapView({
     () =>
       active
         .filter((r) => {
-          if (mode === "new") return isNewToday(r, now);
+          if (onlyNew && !isNew(r)) return false;
           if (mode === "unreviewed") return isUnreviewed(r);
           if (mode === "matches") return r.fits || isLiked(r);
           if (mode === "liked") return isLiked(r);
@@ -148,12 +154,12 @@ export function MapView({
           if (mode === "applied") return r.pipeline?.stage === "applied";
           return true;
         })
-        .sort((a, b) => mode === "new" || mode === "unreviewed"
+        .sort((a, b) => onlyNew || mode === "unreviewed"
           ? Date.parse(b.listing.first_seen_at) - Date.parse(a.listing.first_seen_at)
           : b.score.total - a.score.total),
-    [active, mode, now],
+    [active, mode, onlyNew, isNew],
   );
-  const reviewing = mode === "new" || mode === "unreviewed";
+  const reviewing = onlyNew || mode === "unreviewed";
   const selectedIndex = visibleRows.findIndex((r) => r.listing.id === focus);
   const nextRow = visibleRows[selectedIndex + 1];
   const listingsGeo = useMemo(() => {
@@ -500,8 +506,9 @@ export function MapView({
   }, [loaded, focus, located, lat, lng]);
 
   useEffect(() => {
-    if (!loaded || editDestinations || framed.current === mode) return;
-    framed.current = mode;
+    const frame = [mode, onlyNew, runId].join("/");
+    if (!loaded || editDestinations || searchLoading || searchError || framed.current === frame) return;
+    framed.current = frame;
     if (focus) return;
     const campus = campusPoint(destinations);
     const points = [
@@ -517,7 +524,7 @@ export function MapView({
       ],
       { padding: 48, duration: 0 },
     );
-  }, [loaded, mode, focus, listingsGeo, destinations, editDestinations]);
+  }, [loaded, mode, focus, listingsGeo, destinations, editDestinations, onlyNew, runId, searchLoading, searchError]);
 
   async function decide(action: "shortlisted" | "applied" | "hide") {
     if (!selected || busy) return;
@@ -560,12 +567,10 @@ export function MapView({
                 value={mode}
                 onChange={(e) => {
                   setMode(e.target.value);
-                  setOverlap([]);
                 }}
               >
                 <option value="matches">Matches</option>
                 <option value="all">All found</option>
-                <option value="new">New · last 24 hours</option>
                 <option value="unreviewed">Unreviewed</option>
                 <option value="checking">Needs checking</option>
                 <option value="liked">I like these</option>
@@ -583,11 +588,17 @@ export function MapView({
                 {visibleRows.length} listings
               </button>
             </div>
-            {!visibleRows.length && (
+            <label className="mt-2 flex items-center gap-2">
+              <input type="checkbox" checked={onlyNew} onChange={(e) => setMode(mode, e.target.checked)} />
+              {searchRun ? "New in this search" : "New in latest search"}
+            </label>
+            {searchLoading && <p role="status">Loading search results…</p>}
+            {searchError && <p role="alert">{searchError}</p>}
+            {!searchLoading && !searchError && !visibleRows.length && (
               <p className="py-2">
                 No listings in this view.
-                {mode !== "all" && (
-                  <button className="ml-1 underline" onClick={() => setMode("all")}>
+                {(mode !== "all" || onlyNew) && (
+                  <button className="ml-1 underline" onClick={() => setMode("all", false)}>
                     See all listings
                   </button>
                 )}

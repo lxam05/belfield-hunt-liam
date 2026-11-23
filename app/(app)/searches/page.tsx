@@ -1,26 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import {
-  firstSeenBetween,
-  isNewToday,
-  isUnreviewed,
-  type ReviewFilter,
-} from "@/lib/listing-review";
+import { isUnreviewed, type ReviewFilter } from "@/lib/listing-review";
 import { useRows } from "@/lib/store/hooks";
-import { useReviewClock } from "@/components/app/use-review-clock";
-
-type Run = {
-  apify_run_id: string;
-  received_at: string;
-  finished_at: string | null;
-  items: number;
-  new_items: number;
-  status: string;
-};
-type Home = { id: number; title: string; price_text: string | null };
+import { useSearchResults, useSearchData, type Run } from "@/components/app/use-search-results";
 
 function updateSearch(run: string, filter: ReviewFilter) {
   const url = new URL(window.location.href);
@@ -30,70 +15,30 @@ function updateSearch(run: string, filter: ReviewFilter) {
   window.history.pushState(null, "", url);
 }
 
-function useSearchData<T>(url: string | null) {
-  const [result, setResult] = useState<{ url: string; data?: T; error?: string } | null>(null);
-  useEffect(() => {
-    if (!url) return;
-    const controller = new AbortController();
-    async function load(path: string) {
-      try {
-        const res = await fetch(path, { signal: controller.signal });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Could not load search results.");
-        if (!controller.signal.aborted) setResult({ url: path, data });
-      } catch (e) {
-        if (!controller.signal.aborted)
-          setResult({
-            url: path,
-            error: e instanceof Error ? e.message : "Could not load search results.",
-          });
-      }
-    }
-    void load(url);
-    return () => controller.abort();
-  }, [url]);
-  return result?.url === url ? result : null;
-}
-
 export default function Searches() {
   const params = useSearchParams();
   const selected = params.get("run") ?? "";
   const show = params.get("show");
   const filter = show === "new" || show === "unreviewed" ? show : "all";
   const history = useSearchData<Run[]>("/api/scrape-history");
-  const runResults = useSearchData<Home[]>(
-    selected ? "/api/scrape-history?run=" + encodeURIComponent(selected) : null,
-  );
-  const run = history?.data?.find((r) => r.apify_run_id === selected);
+  const results = useSearchResults(selected, filter === "new");
   const rows = useRows();
   const byId = useMemo(() => new Map(rows.map((r) => [r.listing.id, r])), [rows]);
-  const now = useReviewClock();
-  const homes = selected ? (runResults?.data ?? []) : rows.map((r) => r.listing);
+  const homes = selected ? (results.homes ?? []) : rows.map((r) => r.listing);
   const visible = homes
     .filter((home) => {
       if (filter === "all") return true;
       const row = byId.get(home.id);
       if (!row) return false;
       if (filter === "unreviewed") return isUnreviewed(row);
-      if (!selected) return isNewToday(row, now);
-      return (
-        run?.status === "succeeded" &&
-        run.new_items > 0 &&
-        !!run.finished_at &&
-        firstSeenBetween(
-          row.listing.first_seen_at,
-          Date.parse(run.received_at),
-          Date.parse(run.finished_at),
-        )
-      );
+      return results.isNew(row);
     })
     .sort((a, b) =>
       (byId.get(b.id)?.listing.first_seen_at ?? "").localeCompare(
         byId.get(a.id)?.listing.first_seen_at ?? "",
       ),
     );
-  const error = selected ? runResults?.error || (filter === "new" && history?.error) : null;
-  const loading = selected && (!runResults || (filter === "new" && !history));
+  const { error, loading } = results;
 
   return (
     <section className="mx-auto max-w-2xl space-y-4 p-5 pb-24">
@@ -128,7 +73,7 @@ export default function Searches() {
               : value === "new"
                 ? selected
                   ? "New in this search"
-                  : "New · last 24 hours"
+                  : "New in latest search"
                 : "Unreviewed"}
           </button>
         ))}
@@ -154,7 +99,11 @@ export default function Searches() {
             row && row.listing.status !== "gone"
               ? "/map?focus=" +
                 h.id +
-                (!selected && !row.pipeline?.hidden ? "&show=" + filter : "&show=all")
+                (filter === "new"
+                  ? "&show=all&new=1" + (selected ? "&run=" + encodeURIComponent(selected) : "")
+                  : !selected && !row.pipeline?.hidden
+                    ? "&show=" + filter
+                    : "&show=all")
               : "https://www.daft.ie/for-rent/listing/" + h.id;
           return (
             <Link key={h.id} className="paper-note block p-3" href={href}>

@@ -24,7 +24,3 @@ export function firstSeenBetween(firstSeen: string, start: number, end: number) 
   const time = Date.parse(firstSeen);
   return time >= start && time <= end;
 }
-
-export function isNewToday(row: Row, now: number) {
-  return firstSeenBetween(row.listing.first_seen_at, now - 24 * 3600_000, now);
-}

@@ -1,8 +1,9 @@
 import { expect, it } from "vitest";
 import type { Row } from "@/lib/store/hooks";
-import { isNewToday, isUnreviewed } from "@/lib/listing-review";
+import { firstSeenBetween, isUnreviewed } from "@/lib/listing-review";
 
-const now = Date.parse("2026-11-23T12:00:00Z");
+const start = Date.parse("2026-11-22T11:59:00Z");
+const end = start + 120_000;
 const home = {
   listing: { first_seen_at: "2026-11-22T12:00:00Z", status: "active" },
   votes: [],
@@ -12,9 +13,9 @@ const home = {
 
 it("keeps discovery time independent of group decisions and repeat scrapes", () => {
   const liked = { ...home, votes: [{ value: 1 }] } as Row;
-  expect(isNewToday(liked, now)).toBe(true);
+  expect(firstSeenBetween(liked.listing.first_seen_at, start, end)).toBe(true);
   expect(isUnreviewed(liked)).toBe(false);
-  expect(isNewToday(home, now + 1)).toBe(false);
+  expect(firstSeenBetween(home.listing.first_seen_at, end, end + 120_000)).toBe(false);
   expect(isUnreviewed(home)).toBe(true);
 });
 
